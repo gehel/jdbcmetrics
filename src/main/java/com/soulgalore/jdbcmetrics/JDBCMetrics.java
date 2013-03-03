@@ -22,6 +22,7 @@ package com.soulgalore.jdbcmetrics;
 
 import java.util.concurrent.TimeUnit;
 
+import com.soulgalore.jdbcmetrics.configurator.MetricsConfigurator;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.Meter;
@@ -34,6 +35,9 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public class JDBCMetrics {
+    
+    private static final String METRICS_CONFIGURATORS = JDBCMetrics.class
+            .getName() + ".metricsConfigurators";
 
 	private static final String GROUP = "jdbc";
 	private static final String TYPE_READ = "read";
@@ -70,7 +74,63 @@ public class JDBCMetrics {
 
 	
 	private JDBCMetrics() {
+	    configureMetricsRegistry();
 	}
+
+    /**
+     * Configure reporting for the {@link MetricsRegistry}.
+     * 
+     * An exception will be thrown if the {@link MetricsRegistry} cannot be
+     * configured. Throwing exception from constructor might not be the best
+     * practice, but I prefer an early and clear failure. We could just log the
+     * problems and continue as the {@link JDBCMetricsDriver} is still
+     * functional even without this configuration.
+     * 
+     * @param configurators
+     *            comma separated list of name of classes implementing
+     *            {@link MetricsConfigurator}
+     * @throws IllegalArgumentException
+     *             if the given classes do not implement
+     *             {@link MetricsConfigurator} or cannot be found on the
+     *             classpath
+     * @throws RuntimeException
+     *             if the given classes cannot be instantiated or cannot be
+     *             accessed
+     */
+    private void configureMetricsRegistry() {
+        String configurators = System.getProperty(METRICS_CONFIGURATORS);
+
+        // if METRICS_CONFIGURATORS property is not set, then dont do any
+        // configuration
+        if (configurators == null || configurators.length() == 0) {
+            return;
+        }
+
+        for (String configuratorName : configurators.split(",")) {
+            try {
+                Class<?> clazz = Class.forName(configuratorName);
+                if (!clazz.isInstance(MetricsConfigurator.class)) {
+                    throw new IllegalArgumentException("MetricsConfigurator ["
+                            + configuratorName + "] is not of type ["
+                            + MetricsConfigurator.class.getName() + "]");
+                }
+                @SuppressWarnings("unchecked")
+                Class<MetricsConfigurator> configuratorClass = (Class<MetricsConfigurator>) clazz;
+                MetricsConfigurator configurator = configuratorClass
+                        .newInstance();
+                configurator.configure(getRegistry());
+            } catch (ClassNotFoundException classNotFoundEx) {
+                throw new IllegalArgumentException("MetricsConfigurator ["
+                        + configuratorName + "] not found.", classNotFoundEx);
+            } catch (InstantiationException ie) {
+                throw new RuntimeException("MetricsConfigurator ["
+                        + configuratorName + "] cannot be instantiated.", ie);
+            } catch (IllegalAccessException iae) {
+                throw new RuntimeException("MetricsConfigurator ["
+                        + configuratorName + "] cannot be accessed.", iae);
+            }
+        }
+    }
 
 	/**
 	 * Get the instance.

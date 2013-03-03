@@ -100,6 +100,12 @@ Add the filter in your **web.xml** file (make sure it run early in the chain):
 
 Click [here](http://metrics.codahale.com/manual/core/#reporters) for documentation of how to setup the reporters.
 
+To configure reporters without changing any of your application code, you can add configuration classes to your class path and load by setting the system property `com.soulgalore.jdbcmetrics.JDBCMetrics.metricsConfigurators`. For example:
+
+<pre>
+-Dcom.soulgalore.jdbcmetrics.JDBCMetrics.metricsConfigurators=com.soulgalore.jdbcmetrics.configurator.JMXConfigurator
+</pre>
+
 And here's a real world example of setting up an metrics servlet:
 
 First add it the servlet to your **pom.xml** file:
